@@ -1,0 +1,294 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        :root { --bg-color: #1a1a2e; --accent: #00d2ff; }
+        body { background: var(--bg-color); color: white; font-family: 'Segoe UI', sans-serif; text-align: center; margin: 0; padding: 0; overflow-x: hidden; }
+        nav { background: #0f172a; padding: 15px; display: flex; justify-content: center; gap: 20px; border-bottom: 2px solid var(--accent); position: sticky; top: 0; z-index: 2000; }
+        .nav-btn { padding: 10px 25px; cursor: pointer; border-radius: 5px; background: #16213e; border: 1px solid var(--accent); color: white; font-weight: bold; transition: 0.3s; }
+        .nav-btn.active { background: var(--accent); color: #1a1a2e; }
+        .tab-content { display: none; padding: 20px; animation: fadeIn 0.5s; }
+        .tab-content.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        .tour-joueur { background: #0f172a; }
+        .tour-ia { background: #2d0a0a; }
+        .plateau-global { display: flex; justify-content: center; align-items: center; gap: 20px; margin-top: 10px; }
+        .zone-info { display: flex; flex-direction: column; gap: 10px; align-items: center; width: 110px; }
+        .pile { width: 85px; height: 110px; border: 2px solid #444; border-radius: 10px; display: flex; flex-direction: column; justify-content: center; align-items: center; font-size: 0.75em; background: #16213e; position: relative; }
+        .pile-deck { background: linear-gradient(135deg, #1e3799, #0984e3); border-color: #00d2ff; }
+        .badge-actions { background: #00d2ff; color: #1a1a2e; padding: 10px; border-radius: 10px; font-weight: bold; width: 90px; }
+        .plateau { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+        .ligne { display: flex; gap: 8px; }
+        .case { width: 95px; height: 130px; border: 2px solid #444; border-radius: 8px; background: #16213e; display: flex; justify-content: center; align-items: center; cursor: pointer; position: relative; }
+        .monstre { background: #e94560; color: white; width: 92%; height: 92%; border-radius: 6px; display: flex; flex-direction: column; justify-content: space-around; font-size: 0.65em; padding: 2px; position: relative; }
+        .monstre.adversaire { background: #6c5ce7; }
+        .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 2px; background: rgba(0,0,0,0.2); border-radius: 4px; }
+        .grid-casier { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 15px; max-width: 1000px; margin: 0 auto; }
+        .card-collection { background: #16213e; border: 1px solid #444; padding: 10px; border-radius: 10px; text-align: center; }
+        .shop-placeholder { padding: 50px; border: 2px dashed var(--accent); border-radius: 20px; margin: 20px; }
+        #end-screen { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 3000; flex-direction: column; justify-content: center; align-items: center; }
+        #main-joueur { display: flex; gap: 10px; justify-content: center; padding: 15px; min-height: 140px; background: rgba(15, 52, 96, 0.5); border-radius: 15px; margin: 15px auto; max-width: 90vw; overflow-x: auto; }
+        button { padding: 12px 20px; background: #00d2ff; border: none; border-radius: 5px; color: #1a1a2e; font-weight: bold; cursor: pointer; margin: 0 5px; }
+        .dmg-popup { position: absolute; color: #ff4757; font-size: 26px; font-weight: bold; animation: floatUp 1.2s forwards; z-index: 100; text-shadow: 2px 2px black; pointer-events: none; }
+        @keyframes floatUp { 0% { opacity: 1; transform: translateY(0); } 100% { opacity: 0; transform: translateY(-70px); } }
+        .selected { border: 3px solid #00d2ff !important; box-shadow: 0 0 15px #00d2ff; }
+        .targetable { border: 2px dashed #f1c40f !important; }
+        .shake { animation: shake 0.4s both; }
+        @keyframes shake { 10%, 90% { transform: translate3d(-2px, 0, 0); } 20%, 80% { transform: translate3d(4px, 0, 0); } 30%, 50%, 70% { transform: translate3d(-6px, 0, 0); } }
+    </style>
+</head>
+<body>
+    <nav>
+        <div class="nav-btn active" onclick="switchTab('combat', this)">BATAILLE</div>
+        <div class="nav-btn" onclick="switchTab('casier', this)">CASIER</div>
+        <div class="nav-btn" onclick="switchTab('boutique', this)">BOUTIQUE</div>
+    </nav>
+
+    <div id="tab-combat" class="tab-content active">
+        <div id="end-screen">
+            <h2 id="end-title">FIN</h2>
+            <button onclick="initialiserJeu()">REJOUER</button>
+        </div>
+        <div id="log-message" style="color: #f8a5c2; font-size: 1.2em; font-weight: bold; height: 1.5em;">Prêt pour le duel ?</div>
+        <div class="plateau-global">
+            <div class="zone-info">
+                <small>CIM. ADV.</small><div id="cim-adv" class="pile">0</div>
+                <small style="margin-top:20px">CIM. JOUEUR</small><div id="cim-joueur" class="pile">0</div>
+            </div>
+            <div class="plateau">
+                <div class="ligne" id="adv-derriere"><div class="case"></div><div class="case"></div><div class="case"></div></div>
+                <div class="ligne" id="adv-devant" style="margin-bottom: 10px;">
+                    <div class="case" onclick="clicCibleAdverse(0)"></div><div class="case" onclick="clicCibleAdverse(1)"></div><div class="case" onclick="clicCibleAdverse(2)"></div>
+                </div>
+                <div style="width: 100%; border-top: 2px dashed #444;"></div>
+                <div class="ligne" id="joueur-devant" style="margin-top: 10px;">
+                    <div class="case" onclick="clicCaseJoueur('devant', 0)"></div><div class="case" onclick="clicCaseJoueur('devant', 1)"></div><div class="case" onclick="clicCaseJoueur('devant', 2)"></div>
+                </div>
+                <div class="ligne" id="joueur-derriere">
+                    <div class="case" onclick="clicCaseJoueur('derriere', 0)"></div><div class="case" onclick="clicCaseJoueur('derriere', 1)"></div><div class="case" onclick="clicCaseJoueur('derriere', 2)"></div>
+                </div>
+            </div>
+            <div class="zone-info">
+                <small>DEC. ADV.</small><div id="deck-adv" class="pile pile-deck" style="height:60px">20</div>
+                <div class="badge-actions" style="margin: 10px 0;">ACTIONS<br><span id="actions">3</span>/3</div>
+                <small>MON DECK</small><div id="deck-joueur" class="pile pile-deck" style="height:60px">20</div>
+            </div>
+        </div>
+        <div id="main-joueur"></div>
+        <div class="controles">
+            <button id="btn-pioche" onclick="piocherAction()">PIOCHER</button>
+            <button id="btn-fin" onclick="finirTourJoueur()" style="background:#e94560; color:white;">FINIR TOUR</button>
+        </div>
+    </div>
+
+    <div id="tab-casier" class="tab-content">
+        <h2>VOTRE CASIER</h2>
+        <div class="grid-casier" id="container-casier"></div>
+    </div>
+
+    <div id="tab-boutique" class="tab-content">
+        <h2>BOUTIQUE</h2>
+        <div class="shop-placeholder"><h3>Bientôt disponible...</h3></div>
+    </div>
+
+    <script>
+        const DATA_TODORI = [
+            {n:"Todori",a:1,d:3,v:2,s:2,i:1}, {n:"Todori des Mers",a:4,d:6,v:3,s:4,i:2},
+            {n:"Todori Monstre",a:6,d:5,v:2,s:3,i:1}, {n:"Todori Vent",a:3,d:5,v:4,s:5,i:3},
+            {n:"Todori Arbre",a:5,d:7,v:5,s:1,i:2}, {n:"Todori Mort-Vivant",a:7,d:5,v:6,s:4,i:4},
+            {n:"Todori Ange",a:6,d:3,v:4,s:7,i:5}, {n:"Todori de Glace",a:5,d:7,v:3,s:3,i:3},
+            {n:"Todori Croyant",a:7,d:4,v:6,s:5,i:5}, {n:"Todori de Feu",a:9,d:2,v:4,s:6,i:4},
+            {n:"Todori Électrique",a:5,d:2,v:3,s:4,i:4}, {n:"Todori Explosé",a:10,d:0,v:3,s:4,i:1},
+            {n:"Todori Temps",a:4,d:4,v:5,s:6,i:5}, {n:"Todori Sniper",a:5,d:3,v:4,s:4,i:5},
+            {n:"Todori Muscle",a:7,d:5,v:6,s:4,i:1}, {n:"Todori Nature",a:5,d:3,v:6,s:4,i:3},
+            {n:"Todori Météo",a:7,d:3,v:5,s:6,i:5}, {n:"Todori Robot",a:5,d:2,v:4,s:6,i:3},
+            {n:"Todori Roche",a:5,d:8,v:5,s:4,i:4}, {n:"Todori Saturne",a:5,d:5,v:4,s:5,i:3}
+        ];
+
+        let dJ, dA, mJ, mA, acts, terrain, turn, cimJ, cimA, selMain, attacker, hasAttacked, nbTours, hasSwitched;
+
+        function switchTab(tabId, btn) {
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('tab-' + tabId).classList.add('active');
+            btn.classList.add('active');
+            if(tabId === 'casier') genererCasier();
+        }
+
+        function genererCasier() {
+            const container = document.getElementById('container-casier');
+            container.innerHTML = "";
+            DATA_TODORI.forEach(t => {
+                container.innerHTML += `<div class="card-collection"><b>${t.n}</b><br><small>ATK: ${t.a} | DEF: ${t.d}</small></div>`;
+            });
+        }
+
+        function initialiserJeu() {
+            document.getElementById('end-screen').style.display = 'none';
+            dJ = [...DATA_TODORI].sort(() => Math.random() - 0.5);
+            dA = [...DATA_TODORI].sort(() => Math.random() - 0.5);
+            mJ = []; mA = []; acts = 3; turn = "J"; cimJ = 0; cimA = 0; hasAttacked = false; selMain = null; nbTours = 0; hasSwitched = false;
+            terrain = {
+                joueur: { devant: [null, null, null], derriere: [null, null, null] },
+                adversaire: { devant: [null, null, null], derriere: [null, null, null] }
+            };
+            for(let i=0; i<4; i++) { piocherAuto(true); piocherAuto(false); }
+            maj();
+        }
+
+        function piocherAuto(j) {
+            if(j && dJ.length > 0) { 
+                let c = dJ.pop(); 
+                mJ.push({...c, nom: c.n, atq: c.a, def: c.d, vie: c.v, vit: c.s, int: c.i, canEsquive: c.s >= 7}); 
+            } else if(!j && dA.length > 0) { 
+                let c = dA.pop(); 
+                mA.push({...c, nom: c.n, atq: c.a, def: c.d, vie: c.v, vit: c.s, int: c.i, canEsquive: c.s >= 7}); 
+            }
+        }
+
+        function piocherAction() { if (turn === "J" && acts > 0 && dJ.length > 0) { piocherAuto(true); acts--; maj(); } }
+
+        function clicCaseJoueur(lig, i) {
+            if (turn !== "J" || acts <= 0) return;
+            let target = terrain.joueur[lig][i];
+            if (selMain !== null) {
+                if (!target) {
+                    let m = mJ[selMain];
+                    let mode = confirm("OK pour Mode ATTAQUE ? (Annuler pour DÉFENSE)") ? "ATQ" : "DEF";
+                    m.mode = mode; if(m.mode === "DEF") m.vie += m.def;
+                    terrain.joueur[lig][i] = m;
+                    mJ.splice(selMain, 1); selMain = null; acts--; maj();
+                    verifierTerrains();
+                }
+                return;
+            }
+            if (target) {
+                if (lig === 'derriere') {
+                    if (!hasSwitched && confirm("Échanger avec devant ? (1 Action)")) {
+                        let temp = terrain.joueur.devant[i];
+                        terrain.joueur.devant[i] = terrain.joueur.derriere[i];
+                        terrain.joueur.derriere[i] = temp;
+                        acts--; hasSwitched = true; maj();
+                    }
+                } else {
+                    let choix = prompt("(A)ttaquer / (M)ode");
+                    if (choix?.toUpperCase() === 'A' && !hasAttacked && target.mode === "ATQ") { attacker = {i}; maj(); }
+                    else if (choix?.toUpperCase() === 'M') {
+                        target.mode = target.mode === "ATQ" ? "DEF" : "ATQ";
+                        if(target.mode === "DEF") target.vie += target.def; else target.vie = Math.max(1, target.vie - target.def);
+                        acts--; maj();
+                    }
+                }
+            }
+        }
+
+        async function appliquerDmg(cible, dmg, el, camp, idx) {
+            if (cible.canEsquive) { cible.canEsquive = false; showPop(el, "ESQUIVE !", "#2ecc71"); maj(); return; }
+            el.classList.add('shake'); showPop(el, `-${dmg} ❤️`, "#ff4757");
+            setTimeout(() => el.classList.remove('shake'), 400);
+            cible.vie -= dmg;
+            if (cible.vie <= 0) {
+                await new Promise(r => setTimeout(r, 600));
+                terrain[camp].devant[idx] = null;
+                if(terrain[camp].derriere[idx]) { terrain[camp].devant[idx] = terrain[camp].derriere[idx]; terrain[camp].derriere[idx] = null; }
+                if(camp === 'joueur') cimJ++; else cimA++;
+            }
+            maj(); verifierTerrains();
+        }
+
+        function showPop(el, txt, color) {
+            const p = document.createElement('div'); p.className = 'dmg-popup';
+            p.innerText = txt; p.style.color = color; el.appendChild(p);
+            setTimeout(() => p.remove(), 1200);
+        }
+
+        async function clicCibleAdverse(i) {
+            if (!attacker || !terrain.adversaire.devant[i]) return;
+            hasAttacked = true; acts--;
+            await appliquerDmg(terrain.adversaire.devant[i], terrain.joueur.devant[attacker.i].atq, document.getElementById('adv-devant').children[i], 'adversaire', i);
+            attacker = null;
+        }
+
+        function verifierTerrains() {
+            if (nbTours < 1) return;
+            let jVide = terrain.joueur.devant.every(x => !x) && terrain.joueur.derriere.every(x => !x);
+            let aVide = terrain.adversaire.devant.every(x => !x) && terrain.adversaire.derriere.every(x => !x);
+            if (jVide) showEnd('DÉFAITE !', '#ff4757');
+            else if (aVide) showEnd('VICTOIRE !', '#00d2ff');
+        }
+
+        function showEnd(txt, color) {
+            document.getElementById('end-title').innerText = txt;
+            document.getElementById('end-screen').style.display = 'flex';
+        }
+
+        function finirTourJoueur() {
+            turn = "IA"; hasAttacked = false; hasSwitched = false;
+            document.getElementById('tab-combat').className = "tab-content active tour-ia";
+            maj(); setTimeout(jouerIA, 1000);
+        }
+
+        async function jouerIA() {
+            let iaActs = 3; piocherAuto(false); iaActs--; maj();
+            while (iaActs > 0 && mA.length > 0) {
+                let poseDone = false;
+                for(let l of ['devant','derriere']) {
+                    for(let i=0; i<3; i++) {
+                        if(!terrain.adversaire[l][i] && !poseDone) {
+                            let m = mA.shift(); m.mode = "ATQ";
+                            terrain.adversaire[l][i] = m; poseDone = true; break;
+                        }
+                    }
+                }
+                if(poseDone) { iaActs--; maj(); await new Promise(r => setTimeout(r, 600)); } else break;
+            }
+            let cibleIdx = terrain.joueur.devant.findIndex(x => x !== null);
+            if (cibleIdx !== -1) {
+                for(let i=0; i<3; i++) {
+                    let mIA = terrain.adversaire.devant[i];
+                    if(mIA && mIA.mode === "ATQ") {
+                        await appliquerDmg(terrain.joueur.devant[cibleIdx], mIA.atq, document.getElementById('joueur-devant').children[cibleIdx], 'joueur', cibleIdx);
+                        break;
+                    }
+                }
+            }
+            nbTours++; turn = "J"; acts = 3;
+            document.getElementById('tab-combat').className = "tab-content active tour-joueur";
+            piocherAuto(true); maj();
+        }
+
+        function maj() {
+            document.getElementById('actions').innerText = acts;
+            document.getElementById('deck-joueur').innerText = dJ.length;
+            document.getElementById('deck-adv').innerText = dA.length;
+            document.getElementById('cim-joueur').innerText = cimJ;
+            document.getElementById('cim-adv').innerText = cimA;
+            const mainDiv = document.getElementById('main-joueur');
+            mainDiv.innerHTML = "";
+            mJ.forEach((m, i) => {
+                let card = document.createElement('div');
+                card.className = "case" + (selMain === i ? " selected" : "");
+                card.onclick = () => { if(turn==="J") { selMain = i; attacker = null; maj(); } };
+                card.innerHTML = `<div class="monstre" style="background:white; color:#1a1a2e"><b>${m.nom}</b><div class="stat-grid"><span>⚔️${m.atq}</span><span>🛡️${m.def}</span><span>⚡${m.vit}</span><span>🧠${m.int}</span></div><div style="font-weight:bold; color:red">❤️ ${m.vie}</div></div>`;
+                mainDiv.appendChild(card);
+            });
+            const sync = (l, c) => {
+                const dom = document.getElementById((c==='joueur'?'joueur':'adv')+'-'+l).children;
+                terrain[c][l].forEach((m, i) => {
+                    dom[i].className = "case" + (attacker && c==='joueur' && attacker.i===i && l==='devant' ? " selected" : "") + (attacker && c==='adversaire' && l==='devant' && m ? " targetable" : "");
+                    if (m) {
+                        dom[i].innerHTML = `${m.mode === "DEF" ? '<div style="position:absolute;top:-5px;right:-5px;background:#f1c40f;border-radius:50%;width:20px;height:20px;display:flex;justify-content:center;align-items:center;border:2px solid white;z-index:5">🛡️</div>' : ''}
+                            <div class="monstre ${c==='adversaire'?'adversaire':''}" style="${c==='joueur'?'background:white;color:#1a1a2e':''}">
+                                <b>${m.nom}</b><div class="stat-grid"><span>⚔️${m.atq}</span><span>🛡️${m.def}</span><span>⚡${m.vit}</span><span>🧠${m.int}</span></div><div style="font-weight:bold">❤️ ${m.vie}</div>
+                            </div>`;
+                    } else dom[i].innerHTML = "";
+                });
+            };
+            sync('devant','joueur'); sync('derriere','joueur'); sync('devant','adversaire'); sync('derriere','adversaire');
+            document.getElementById('btn-pioche').disabled = (turn !== "J" || acts <= 0 || dJ.length === 0);
+            document.getElementById('btn-fin').disabled = (turn !== "J");
+        }
+        initialiserJeu();
+    </script>
+</body>
+</html>
