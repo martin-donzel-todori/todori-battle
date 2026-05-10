@@ -2,7 +2,7 @@
 <html>
 <head>
     <style>
-        :root { --bg-color: #1a1a2e; --accent: #00d2ff; }
+        :root { --bg-color: #1a1a2e; --accent: #00d2ff; --locked: #444; }
         body { background: var(--bg-color); color: white; font-family: 'Segoe UI', sans-serif; text-align: center; margin: 0; padding: 0; overflow-x: hidden; }
         nav { background: #0f172a; padding: 15px; display: flex; justify-content: center; gap: 20px; border-bottom: 2px solid var(--accent); position: sticky; top: 0; z-index: 2000; }
         .nav-btn { padding: 10px 25px; cursor: pointer; border-radius: 5px; background: #16213e; border: 1px solid var(--accent); color: white; font-weight: bold; transition: 0.3s; }
@@ -10,6 +10,16 @@
         .tab-content { display: none; padding: 20px; animation: fadeIn 0.5s; }
         .tab-content.active { display: block; }
         @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        
+        /* Section Casier */
+        .casier-section { margin-bottom: 40px; border: 1px solid #333; padding: 15px; border-radius: 15px; background: rgba(0,0,0,0.2); }
+        .casier-section h3 { color: var(--accent); border-bottom: 1px solid var(--accent); padding-bottom: 10px; }
+        .grid-casier { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 15px; max-width: 1000px; margin: 0 auto; }
+        .card-collection { background: #16213e; border: 1px solid #444; padding: 10px; border-radius: 10px; text-align: center; cursor: pointer; position: relative; }
+        .card-collection.locked { opacity: 0.5; filter: grayscale(1); border: 1px dashed #666; }
+        .card-collection.in-deck { border: 2px solid #2ecc71; box-shadow: 0 0 10px #2ecc71; }
+        
+        /* Plateau & Jeu */
         .tour-joueur { background: #0f172a; }
         .tour-ia { background: #2d0a0a; }
         .plateau-global { display: flex; justify-content: center; align-items: center; gap: 20px; margin-top: 10px; }
@@ -23,10 +33,6 @@
         .monstre { background: #e94560; color: white; width: 92%; height: 92%; border-radius: 6px; display: flex; flex-direction: column; justify-content: space-around; font-size: 0.65em; padding: 2px; position: relative; }
         .monstre.adversaire { background: #6c5ce7; }
         .stat-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; padding: 2px; background: rgba(0,0,0,0.2); border-radius: 4px; }
-        .grid-casier { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 15px; max-width: 1000px; margin: 0 auto; }
-        .card-collection { background: #16213e; border: 1px solid #444; padding: 10px; border-radius: 10px; text-align: center; }
-        .shop-placeholder { padding: 50px; border: 2px dashed var(--accent); border-radius: 20px; margin: 20px; }
-        #end-screen { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.95); z-index: 3000; flex-direction: column; justify-content: center; align-items: center; }
         #main-joueur { display: flex; gap: 10px; justify-content: center; padding: 15px; min-height: 140px; background: rgba(15, 52, 96, 0.5); border-radius: 15px; margin: 15px auto; max-width: 90vw; overflow-x: auto; }
         button { padding: 12px 20px; background: #00d2ff; border: none; border-radius: 5px; color: #1a1a2e; font-weight: bold; cursor: pointer; margin: 0 5px; }
         .dmg-popup { position: absolute; color: #ff4757; font-size: 26px; font-weight: bold; animation: floatUp 1.2s forwards; z-index: 100; text-shadow: 2px 2px black; pointer-events: none; }
@@ -45,7 +51,7 @@
     </nav>
 
     <div id="tab-combat" class="tab-content active">
-        <div id="end-screen">
+        <div id="end-screen" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); z-index:3000; flex-direction:column; justify-content:center; align-items:center;">
             <h2 id="end-title">FIN</h2>
             <button onclick="initialiserJeu()">REJOUER</button>
         </div>
@@ -69,9 +75,9 @@
                 </div>
             </div>
             <div class="zone-info">
-                <small>DEC. ADV.</small><div id="deck-adv" class="pile pile-deck" style="height:60px">20</div>
+                <small>DEC. ADV.</small><div id="deck-adv" class="pile pile-deck" style="height:60px">11</div>
                 <div class="badge-actions" style="margin: 10px 0;">ACTIONS<br><span id="actions">3</span>/3</div>
-                <small>MON DECK</small><div id="deck-joueur" class="pile pile-deck" style="height:60px">20</div>
+                <small>MON DECK</small><div id="deck-joueur" class="pile pile-deck" style="height:60px">11</div>
             </div>
         </div>
         <div id="main-joueur"></div>
@@ -83,27 +89,45 @@
 
     <div id="tab-casier" class="tab-content">
         <h2>VOTRE CASIER</h2>
-        <div class="grid-casier" id="container-casier"></div>
+        
+        <div class="casier-section">
+            <h3>🗃️ MON DECK (Sélectionnés pour le combat - max 15)</h3>
+            <div class="grid-casier" id="casier-deck"></div>
+        </div>
+
+        <div class="casier-section">
+            <h3>🎒 MA COLLECTION (Possédés mais au repos)</h3>
+            <div class="grid-casier" id="casier-possedes"></div>
+        </div>
+
+        <div class="casier-section">
+            <h3>🔒 TODORIS MANQUANTS</h3>
+            <div class="grid-casier" id="casier-manquants"></div>
+        </div>
     </div>
 
     <div id="tab-boutique" class="tab-content">
         <h2>BOUTIQUE</h2>
-        <div class="shop-placeholder"><h3>Bientôt disponible...</h3></div>
+        <div style="padding: 50px; border: 2px dashed var(--accent); border-radius: 20px; margin: 20px;"><h3>Bientôt disponible...</h3></div>
     </div>
 
     <script>
         const DATA_TODORI = [
-            {n:"Todori",a:1,d:3,v:2,s:2,i:1}, {n:"Todori des Mers",a:4,d:6,v:3,s:4,i:2},
-            {n:"Todori Monstre",a:6,d:5,v:2,s:3,i:1}, {n:"Todori Vent",a:3,d:5,v:4,s:5,i:3},
-            {n:"Todori Arbre",a:5,d:7,v:5,s:1,i:2}, {n:"Todori Mort-Vivant",a:7,d:5,v:6,s:4,i:4},
-            {n:"Todori Ange",a:6,d:3,v:4,s:7,i:5}, {n:"Todori de Glace",a:5,d:7,v:3,s:3,i:3},
-            {n:"Todori Croyant",a:7,d:4,v:6,s:5,i:5}, {n:"Todori de Feu",a:9,d:2,v:4,s:6,i:4},
-            {n:"Todori Électrique",a:5,d:2,v:3,s:4,i:4}, {n:"Todori Explosé",a:10,d:0,v:3,s:4,i:1},
-            {n:"Todori Temps",a:4,d:4,v:5,s:6,i:5}, {n:"Todori Sniper",a:5,d:3,v:4,s:4,i:5},
-            {n:"Todori Muscle",a:7,d:5,v:6,s:4,i:1}, {n:"Todori Nature",a:5,d:3,v:6,s:4,i:3},
-            {n:"Todori Météo",a:7,d:3,v:5,s:6,i:5}, {n:"Todori Robot",a:5,d:2,v:4,s:6,i:3},
-            {n:"Todori Roche",a:5,d:8,v:5,s:4,i:4}, {n:"Todori Saturne",a:5,d:5,v:4,s:5,i:3}
+            {id:0, n:"Todori",a:1,d:3,v:2,s:2,i:1}, {id:1, n:"Todori des Mers",a:4,d:6,v:3,s:4,i:2},
+            {id:2, n:"Todori Monstre",a:6,d:5,v:2,s:3,i:1}, {id:3, n:"Todori Vent",a:3,d:5,v:4,s:5,i:3},
+            {id:4, n:"Todori Arbre",a:5,d:7,v:5,s:1,i:2}, {id:5, n:"Todori Mort-Vivant",a:7,d:5,v:6,s:4,i:4},
+            {id:6, n:"Todori Ange",a:6,d:3,v:4,s:7,i:5}, {id:7, n:"Todori de Glace",a:5,d:7,v:3,s:3,i:3},
+            {id:8, n:"Todori Croyant",a:7,d:4,v:6,s:5,i:5}, {id:9, n:"Todori de Feu",a:9,d:2,v:4,s:6,i:4},
+            {id:10, n:"Todori Électrique",a:5,d:2,v:3,s:4,i:4}, {id:11, n:"Todori Explosé",a:10,d:0,v:3,s:4,i:1},
+            {id:12, n:"Todori Temps",a:4,d:4,v:5,s:6,i:5}, {id:13, n:"Todori Sniper",a:5,d:3,v:4,s:4,i:5},
+            {id:14, n:"Todori Muscle",a:7,d:5,v:6,s:4,i:1}, {id:15, n:"Todori Nature",a:5,d:3,v:6,s:4,i:3},
+            {id:16, n:"Todori Météo",a:7,d:3,v:5,s:6,i:5}, {id:17, n:"Todori Robot",a:5,d:2,v:4,s:6,i:3},
+            {id:18, n:"Todori Roche",a:5,d:8,v:5,s:4,i:4}, {id:19, n:"Todori Saturne",a:5,d:5,v:4,s:5,i:3}
         ];
+
+        // Inventaire simulé : le joueur possède les 15 premiers Todori par défaut au début
+        let ownedIds = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14];
+        let deckIds = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14]; // Deck actuel de 15
 
         let dJ, dA, mJ, mA, acts, terrain, turn, cimJ, cimA, selMain, attacker, hasAttacked, nbTours, hasSwitched;
 
@@ -115,18 +139,45 @@
             if(tabId === 'casier') genererCasier();
         }
 
+        function toggleDeck(id) {
+            if (!ownedIds.includes(id)) return;
+            const idx = deckIds.indexOf(id);
+            if (idx > -1) {
+                deckIds.splice(idx, 1);
+            } else {
+                if (deckIds.length < 15) deckIds.push(id);
+                else alert("Votre deck est déjà plein (15 cartes max) !");
+            }
+            genererCasier();
+        }
+
         function genererCasier() {
-            const container = document.getElementById('container-casier');
-            container.innerHTML = "";
+            const divDeck = document.getElementById('casier-deck');
+            const divPossedes = document.getElementById('casier-possedes');
+            const divManquants = document.getElementById('casier-manquants');
+            divDeck.innerHTML = ""; divPossedes.innerHTML = ""; divManquants.innerHTML = "";
+
             DATA_TODORI.forEach(t => {
-                container.innerHTML += `<div class="card-collection"><b>${t.n}</b><br><small>ATK: ${t.a} | DEF: ${t.d}</small></div>`;
+                let html = `<div class="card-collection ${!ownedIds.includes(t.id)?'locked':''} ${deckIds.includes(t.id)?'in-deck':''}" onclick="toggleDeck(${t.id})">
+                    <b>${t.n}</b><br><small>ATK: ${t.a} | DEF: ${t.d}</small>
+                </div>`;
+                
+                if (deckIds.includes(t.id)) divDeck.innerHTML += html;
+                else if (ownedIds.includes(t.id)) divPossedes.innerHTML += html;
+                else divManquants.innerHTML += html;
             });
         }
 
         function initialiserJeu() {
             document.getElementById('end-screen').style.display = 'none';
-            dJ = [...DATA_TODORI].sort(() => Math.random() - 0.5);
-            dA = [...DATA_TODORI].sort(() => Math.random() - 0.5);
+            
+            // On utilise les cartes du Deck configuré dans le casier
+            let playerDeckPool = DATA_TODORI.filter(t => deckIds.includes(t.id));
+            dJ = [...playerDeckPool].sort(() => Math.random() - 0.5);
+            
+            // L'IA garde un pool de 15 aléatoires pour le moment
+            dA = [...DATA_TODORI].sort(() => Math.random() - 0.5).slice(0, 15);
+            
             mJ = []; mA = []; acts = 3; turn = "J"; cimJ = 0; cimA = 0; hasAttacked = false; selMain = null; nbTours = 0; hasSwitched = false;
             terrain = {
                 joueur: { devant: [null, null, null], derriere: [null, null, null] },
